@@ -9,3 +9,6 @@ install all packages
 
 run socketio using below command
 - daphne -b 127.0.0.1 -p 8080 socket_test.asgi:application
+
+run command for static files:
+- python manage.py collectstatic
