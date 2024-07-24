@@ -1,0 +1,90 @@
+{% load static %}
+{% load i18n static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
+    <script src="{% static 'js/script.js' %}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            const userId = 'user_' + Math.floor(Math.random() * 1000);
+            const orgId = '0668e4ce-52de-7beb-8000-f91c94b9f721';
+            let socket;
+            let orgRoom;
+
+            function connectToSocket() {
+                socket = io('http://127.0.0.1:8080', {
+                    query: { userId, orgId }
+                });
+
+                socket.on('connect', (data) => {
+                    console.log('Connected to Socket.IO server with userId:', userId, data);
+                    if (data && data.room) {
+                        orgRoom = data.room;
+                        console.log('Connected to Organization room:', orgRoom);
+                        document.getElementById('status-message').textContent = 'Connected...!';
+                    }
+                });
+
+                socket.on('disconnect', () => {
+                    console.log('Disconnected from Socket.IO server');
+                    document.getElementById('status-message').textContent = 'Disconnected';
+                });
+
+                const events = [
+                    'join_room',
+                    'leave_room',
+                    'receive_message',
+                    'pong'
+                ];
+
+                events.forEach(eventName => {
+                    socket.on(eventName, (data) => {
+                        console.log(`${eventName}:`, data);
+                        if (eventName === 'receive_message' && data.room === orgRoom) {
+                            displayMessage(data);
+                        }
+                    });
+                });
+            }
+
+            function sendMessage() {
+                const message = document.getElementById('chat-message-input').value;
+                socket.emit('send_message', { room: orgRoom, message });
+                console.log('Sent message to room:', orgRoom, 'Message:', message);
+                document.getElementById('chat-message-input').value = '';
+            }
+
+            function displayMessage(data) {
+                const chatLog = document.getElementById('chat-log');
+                chatLog.value += `${data.sid}: ${data.message}\n`;
+                chatLog.scrollTop = chatLog.scrollHeight;
+            }
+
+            connectToSocket();
+
+            const sendMessageButton = document.getElementById('chat-message-submit');
+            sendMessageButton.addEventListener('click', sendMessage);
+
+            document.getElementById('chat-message-input').addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="status-message">Connecting...</div>
+        <h4>Group Name: Org_0668e4ce-52de-7beb-8000-f91c94b9f721</h4>
+        <textarea id="chat-log" readonly></textarea>
+        <input type="text" id="chat-message-input" placeholder="Type your message here...">
+        <input type="button" value="Send" id="chat-message-submit">
+    </div>
+</body>
+</html>
