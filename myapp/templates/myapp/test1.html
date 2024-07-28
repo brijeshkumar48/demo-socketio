@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Client</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        #messageBox,
+        #statusBox,
+        #displayBox {
+            margin-top: 20px;
+        }
+
+        textarea,
+        button {
+            margin-top: 10px;
+        }
+
+        #connectionStatus {
+            padding: 10px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .connected {
+            color: green;
+        }
+
+        .disconnected {
+            color: red;
+        }
+
+        .connection-buttons {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Socket.IO Client</h1>
+
+    <div id="connectionStatus" class="connected">
+        <span id="statusText">Connected..!</span>
+        <div class="connection-buttons">
+            <button id="connectButton" onclick="connect()">Connect</button>
+            <button id="disconnectButton" onclick="disconnect()">Disconnect</button>
+        </div>
+    </div>
+
+    <div id="messageBox">
+        <textarea id="messageInput" rows="3" cols="30" placeholder="Type your message here..."></textarea>
+        <button onclick="sendMessage()">Send Message</button>
+    </div>
+
+    <div id="displayBox">
+        <h4>Received Messages</h4>
+        <div id="messages"></div>
+    </div>
+
+    <div id="statusBox">
+        <h4>Status</h4>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        let socket;
+        const csrftoken = getCookie('csrftoken');
+        const nodeJsApiUrl = "{{ node_js_api_url }}"; // Node.js WebSocket URL
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function connect() {
+            if (!socket) {
+                socket = io(nodeJsApiUrl);
+
+                socket.on('connect', () => {
+                    console.log('Connected to Node.js server');
+                    updateConnectionStatus(true);
+
+                    // Generate userId and send initial data
+                    const userId = `user_${Math.random().toString(36).substr(2, 9)}`;
+                    const orgId = "org_6dhje8u"; // Replace with your fixed unique ID
+
+                    // Emit connection event with userId and orgId
+                    socket.emit('initialData', { userId, orgId });
+                });
+
+                socket.on('disconnect', () => {
+                    console.log('Disconnected from Node.js server');
+                    updateConnectionStatus(false);
+                });
+
+                // Handle received messages from Node.js server
+                socket.on('receiveMessage', (data) => {
+                    const messagesDiv = document.getElementById('messages');
+                    messagesDiv.innerHTML += `<p>Received: ${data.message}</p>`;
+                });
+
+                // Handle other events if necessary
+                socket.on('responseEvent', (data) => {
+                    const messagesDiv = document.getElementById('messages');
+                    messagesDiv.innerHTML += `<p>Response Event: ${JSON.stringify(data)}</p>`;
+                });
+
+                // Handle file upload status updates
+                socket.on('fileUploadStatus', (data) => {
+                    const fileName = data.file_name;
+                    console.log("=====", data.file_name)
+                    const statusMessage = `${fileName} Uploaded Successfully`;
+                    const statusDiv = document.getElementById('status');
+                    statusDiv.innerHTML = `File Upload Status: ${statusMessage}`;
+                });
+
+                // Disable Connect button and enable Disconnect button
+                document.getElementById('connectButton').style.display = 'none';
+                document.getElementById('disconnectButton').style.display = 'inline';
+            }
+        }
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                updateConnectionStatus(false);
+                socket = null; // Clear the socket instance
+
+                // Enable Connect button and disable Disconnect button
+                document.getElementById('connectButton').style.display = 'inline';
+                document.getElementById('disconnectButton').style.display = 'none';
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusText = document.getElementById('statusText');
+            if (connected) {
+                statusText.textContent = 'Connected..!';
+                statusText.classList.remove('disconnected');
+                statusText.classList.add('connected');
+            } else {
+                statusText.textContent = 'Disconnected..!';
+                statusText.classList.remove('connected');
+                statusText.classList.add('disconnected');
+            }
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value;
+            if (message) {
+                fetch('/myapp/', {  // URL to POST message data
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken // Include the CSRF token
+                    },
+                    body: JSON.stringify({ message })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Message sent:', data);
+                    })
+                    .catch(error => {
+                        console.error('Error sending message:', error);
+                    });
+
+                messageInput.value = ''; // Clear input after sending
+            }
+        }
+
+        // Automatically connect when the page loads
+        connect();
+    </script>
+</body>
+
+</html>

@@ -1,89 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat App</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="script.js"></script>
-    <!-- <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script> -->
-    <script>
-        document.addEventListener('DOMContentLoaded', (event) => {
-            const userId = 'user_' + Math.floor(Math.random() * 1000);
-            const orgId = '0668e4ce-52de-7beb-8000-f91c94b9f721';
-            let socket;
-            let orgRoom;
+    <title>Socket.IO Client</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
 
-            function connectToSocket() {
-                socket = io('http://127.0.0.1:8080', {
-                    query: { userId, orgId }
-                });
+        #messageBox,
+        #statusBox,
+        #displayBox {
+            margin-top: 20px;
+        }
 
-                socket.on('connect', (data) => {
-                    console.log('Connected to Socket.IO server with userId:', userId, data);
-                    if (data && data.room) {
-                        orgRoom = data.room;
-                        console.log('Connected to Organization room:', orgRoom);
-                        document.getElementById('status-message').textContent = 'Connected...!';
-                    }
-                });
-
-                socket.on('disconnect', () => {
-                    console.log('Disconnected from Socket.IO server');
-                    document.getElementById('status-message').textContent = 'Disconnected';
-                });
-
-                const events = [
-                    'join_room',
-                    'leave_room',
-                    'receive_message',
-                    'pong'
-                ];
-
-                events.forEach(eventName => {
-                    socket.on(eventName, (data) => {
-                        console.log(`${eventName}:`, data);
-                        if (eventName === 'receive_message' && data.room === orgRoom) {
-                            displayMessage(data);
-                        }
-                    });
-                });
-            }
-
-            function sendMessage() {
-                const message = document.getElementById('chat-message-input').value;
-                socket.emit('send_message', { room: orgRoom, message });
-                console.log('Sent message to room:', orgRoom, 'Message:', message);
-                document.getElementById('chat-message-input').value = '';
-            }
-
-            function displayMessage(data) {
-                const chatLog = document.getElementById('chat-log');
-                chatLog.value += `${data.sid}: ${data.message}\n`;
-                chatLog.scrollTop = chatLog.scrollHeight;
-            }
-
-            connectToSocket();
-
-            const sendMessageButton = document.getElementById('chat-message-submit');
-            sendMessageButton.addEventListener('click', sendMessage);
-
-            document.getElementById('chat-message-input').addEventListener('keypress', function(event) {
-                if (event.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-        });
-    </script>
+        textarea,
+        button {
+            margin-top: 10px;
+        }
+    </style>
 </head>
+
 <body>
-    <div id="chat-container">
-        <div id="status-message">Connecting...</div>
-        <h4>Group Name: Org_0668e4ce-52de-7beb-8000-f91c94b9f721</h4>
-        <textarea id="chat-log" readonly></textarea>
-        <input type="text" id="chat-message-input" placeholder="Type your message here...">
-        <input type="button" value="Send" id="chat-message-submit">
+    <h1>Socket.IO Client</h1>
+
+    <div id="messageBox">
+        <textarea id="messageInput" rows="3" cols="30" placeholder="Type your message here..."></textarea>
+        <button onclick="sendMessage()">Send Message</button>
     </div>
+
+    <div id="displayBox">
+        <h4>Received Messages</h4>
+        <div id="messages"></div>
+    </div>
+
+    <div id="statusBox">
+        <h4>Status</h4>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:3500'); // Node.js WebSocket URL
+
+        // Log connection status
+        socket.on('connect', () => {
+            console.log('Connected to Node.js server');
+        });
+
+        // Handle received messages from Node.js server
+        socket.on('receiveMessage', (data) => {
+            const messagesDiv = document.getElementById('messages');
+            // Assuming 'data' is an object and 'data.message' contains the message text
+            messagesDiv.innerHTML += `<p>Received: ${data.message}</p>`;
+        });
+
+        // Handle other events if necessary
+        socket.on('responseEvent', (data) => {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<p>Response Event: ${JSON.stringify(data)}</p>`;
+        });
+
+        // Handle status updates
+        socket.on('fileUploadStatus', (data) => {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `File Upload Status: ${JSON.stringify(data)}`;
+        });
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value;
+            if (message) {
+                fetch('http://127.0.0.1:8080/myapp/api/send-message/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Message sent:', data);
+                    })
+                    .catch(error => {
+                        console.error('Error sending message:', error);
+                    });
+
+                messageInput.value = ''; // Clear input after sending
+            }
+        }
+    </script>
 </body>
+
 </html>
